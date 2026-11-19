@@ -221,10 +221,10 @@ const CATS = [
   { key:'reb', name:'Recebo compactado',             color:'#c8b48a', types:[] },
   { key:'col', name:'Columnetas',                    color:'#b0b7bf', types:['IFCCOLUMN'] },
   { key:'mur', name:'Muros',                         color:'#b5654a', types:['IFCWALL','IFCWALLSTANDARDCASE'] },
-  { key:'vig', name:'Vigas de amarre y dinteles',    color:'#b0b7bf', types:['IFCBEAM'] },
-  { key:'pla', name:'Placas y losa de entrepiso',    color:'#c9ced4', types:['IFCSLAB'] },
+  { key:'vig', name:'Vigas (entrepiso, enrase, culata), dinteles y antepechos', color:'#b0b7bf', types:['IFCBEAM'] },
+  { key:'pla', name:'Placas de contrapiso y de entrepiso', color:'#c9ced4', types:['IFCSLAB'] },
   { key:'esc', name:'Escalera y baranda',            color:'#9aa5b1', types:['IFCSTAIR','IFCSTAIRFLIGHT','IFCRAILING'] },
-  { key:'cub', name:'Cubierta',                      color:'#4caf50', types:['IFCROOF','IFCCOVERING','IFCMEMBER','IFCPLATE'] },
+  { key:'cub', name:'Cubierta (correas y teja)',     color:'#4caf50', types:['IFCROOF','IFCCOVERING','IFCMEMBER','IFCPLATE'] },
   { key:'ace', name:'Acero de refuerzo y malla',     color:'#d32f2f', types:['IFCREINFORCINGBAR','IFCREINFORCINGMESH'] },
   { key:'otr', name:'Otros',                         color:'#bdbdbd', types:[] },
 ];
@@ -402,7 +402,10 @@ let fgroups = {};   // cat -> [{key, label, ids:[]}]
 function labelOf(id){
   const e = elems.get(id) || {}, m = marks.get(id) || {};
   if (e.cat === 'ace') return m.part ? 'Acero ' + m.part : 'Sin partición · ' + ((e.name || '').split(':')[1] || 'acero');
-  if (e.cat === 'col') return (m.marca || 'Sin marca') + ' · piso ' + (colFloor.get(id) || 1);
+  if (e.cat === 'col') { const mk = m.marca || 'Sin marca';
+    if (/-CU$/.test(mk)) return mk + ' · culata';
+    if (/-P2$/.test(mk)) return mk;
+    return mk + ' · piso ' + (colFloor.get(id) || 1); }
   if (m.marca) return m.marca;
   if (e.cat === 'vig') return 'Sin marca';
   if (autoName.has(id)) return autoName.get(id);
@@ -435,7 +438,7 @@ function nameBeams(){
     if (best) autoName.set(id, 'Ciclópeo ' + best);
   }
 }
-const FILTER_CATS = ['cim', 'col', 'vig', 'ace'];
+const FILTER_CATS = ['cim', 'col', 'mur', 'vig', 'pla', 'cub', 'ace'];
 // piso de cada columneta: piso 2 si arranca a mas de 1,50 m sobre la columneta mas baja
 const colFloor = new Map();
 const bbOf = id => { const b = new THREE.Box3(), v = new THREE.Vector3();
@@ -494,8 +497,13 @@ function isolate(cat, g){
   // acero con la misma particion que la marca del elemento (p. ej. VC-A)
   let steel = null;
   if (cat === 'cim' || cat === 'vig') steel = g.label === 'Sin marca' ? null : (fgroups.ace || []).find(a => a.label === 'Acero ' + g.label);
+  if (cat === 'pla') {   // placas: todo el acero cuya partición empieza igual que la marca (PE-1 -> PE-X, PE-Y, PE-S)
+    const pre = 'Acero ' + g.label.split('-')[0] + '-';
+    const ids = (fgroups.ace || []).filter(a => a.label.startsWith(pre)).flatMap(a => a.ids);
+    if (ids.length) steel = { ids };
+  }
   if (cat === 'col') {   // acero de la columneta: misma particion que su marca y a la misma altura
-    const mk = g.label.split(' · piso')[0], sg = (fgroups.ace || []).find(a => a.label === 'Acero ' + mk);
+    const mk = g.label.split(' · ')[0], sg = (fgroups.ace || []).find(a => a.label === 'Acero ' + mk);
     if (sg) { const B = new THREE.Box3(); for (const id of g.ids) B.union(bbOf(id)); B.expandByScalar(0.3);
       const c = new THREE.Vector3(); const ids = sg.ids.filter(id => B.containsPoint(bbOf(id).getCenter(c)));
       if (ids.length) steel = { ids }; }
