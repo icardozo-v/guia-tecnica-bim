@@ -406,6 +406,7 @@ function labelOf(id){
     if (/-CU$/.test(mk)) return mk + ' · culata';
     if (/-P2$/.test(mk)) return mk;
     return mk + ' · piso ' + (colFloor.get(id) || 1); }
+  if (e.cat === 'esc') return /barandilla|baranda/i.test(e.name || '') ? 'Barandas' : (m.marca && !/^Escalera/.test(m.marca) ? m.marca : 'ESC-1 · tramos y descanso');
   if (m.marca) return m.marca;
   if (e.cat === 'vig') return 'Sin marca';
   if (autoName.has(id)) return autoName.get(id);
@@ -438,7 +439,7 @@ function nameBeams(){
     if (best) autoName.set(id, 'Ciclópeo ' + best);
   }
 }
-const FILTER_CATS = ['cim', 'col', 'mur', 'vig', 'pla', 'cub', 'ace'];
+const FILTER_CATS = ['cim', 'col', 'mur', 'vig', 'pla', 'esc', 'cub', 'ace'];
 // piso de cada columneta: piso 2 si arranca a mas de 1,50 m sobre la columneta mas baja
 const colFloor = new Map();
 const bbOf = id => { const b = new THREE.Box3(), v = new THREE.Vector3();
@@ -500,6 +501,10 @@ function isolate(cat, g){
   if (cat === 'pla') {   // placas: todo el acero cuya partición empieza igual que la marca (PE-1 -> PE-X, PE-Y, PE-S)
     const pre = 'Acero ' + g.label.split('-')[0] + '-';
     const ids = (fgroups.ace || []).filter(a => a.label.startsWith(pre)).flatMap(a => a.ids);
+    if (ids.length) steel = { ids };
+  }
+  if (cat === 'esc') {   // escalera: acero con partición ESC (y VD-1)
+    const ids = (fgroups.ace || []).filter(a => /^Acero (ESC|VD)/.test(a.label)).flatMap(a => a.ids);
     if (ids.length) steel = { ids };
   }
   if (cat === 'col') {   // acero de la columneta: misma particion que su marca y a la misma altura
@@ -612,11 +617,11 @@ async function showInfo(id){
 // ---------- planos ----------
 const PDF_URL = 'planos.pdf';
 const PDFJS_VERSIONS = ['4.4.168', '4.2.67', '4.0.379'];
-const INDEX = {0:'Portada',1:'Índice, notas generales y convenciones',2:'Ejes, niveles y nomenclatura',3:'Replanteo de la excavación',
-  4:'Camillas y nivelación con manguera',5:'Planta de vigas de cimentación',6:'Viga de cimentación tipo 1',7:'Viga de cimentación tipo 2',
-  8:'Viga de cimentación tipo 3',9:'Viga de cimentación tipo 4 y escalón',10:'Arranques, instalaciones y recebo',11:'Muros y columnetas del piso 1',
-  12:'Despiece de columnetas',13:'Dinteles y vigas de antepecho',14:'Placa de contrapiso y sardinel',15:'Vigas de entrepiso',16:'Losa de entrepiso',
-  17:'Muros y columnetas del piso 2',18:'Despiece (piso 2)',19:'Vigas de enrase',20:'Culatas',21:'Cubierta',22:'Detalles típicos y cuadro de cantidades'};
+const INDEX = {0:'Portada',1:'Índice, notas generales y convenciones',2:'Ejes, niveles y nomenclatura · Replanteo',3:'Replanteo de la excavación con camillas e hilos',
+  4:'Detalle de camillas y nivelación con manguera',5:'Planta de vigas de cimentación',6:'Viga de cimentación tipo 1 (VC-A, VC-E)',7:'Viga de cimentación tipo 2 (VC-B, VC-C, VC-D)',
+  8:'Viga de cimentación tipo 3 (VC-1, VC-3)',9:'Viga de cimentación tipo 4 (VC-2) y escalón',10:'Arranques, instalaciones y recebo',11:'Muros de confinamiento piso 1',
+  12:'Despiece de columnetas',13:'Columnetas tipo 3 y cuadro de refuerzo',14:'Dinteles y vigas de antepecho',15:'Vigas y losa de entrepiso',16:'Despiece de vigas de entrepiso',
+  17:'Muros y columnetas del piso 2',18:'Despiece de vigas de enrase',19:'Vigas de enrase',20:'Culatas',21:'Escalera: planta, cortes y despiece',22:'Escalera: cortes y detalles'};
 let pdfjs = null, pdfDoc = null, plist = [], cur = -1, zoom = 1, rtask = null;
 const mobile = matchMedia('(max-width:760px)').matches || coarse;
 const MAX_PIX = mobile ? 16e6 : 60e6;
